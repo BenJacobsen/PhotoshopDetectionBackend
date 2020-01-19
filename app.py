@@ -1,14 +1,19 @@
 # app.py
 from flask import Flask, request, Response
+from datetime import datetime
 import jsonpickle
 import numpy as np
 import hashlib
 import re
 import cv2
 import subprocess
-from datetime import date
+import string
+
 app = Flask(__name__)
 app.config.from_object('config')
+
+def construct_call_str(img_path):
+    return 'python ' + app.config["IMG_PROCESS_PATH"] + 'global_classifier.py --model_path ' + app.config["IMG_PROCESS_PATH"] +  r'weights\global.pth --input_path ' + img_path
 
 @app.route('/api/upload', methods=['POST'])
 def test():
@@ -18,14 +23,12 @@ def test():
     # decode image
     img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
     # get by millisecond instead
-    #dt = datetime.now()
-    #img_name = hashlib.sha224(dt + ).hexdigest()
-    img_path = app.config["BASE_IMAGE_PATH"] + 'test.jpg'
+    now = datetime.now()
+    hash_str = now.strftime("%m/%d/%Y, %H:%M:%S") + r.authorization.username
+    img_name = hashlib.sha224(hash_str.encode('utf-8')).hexdigest() + ".jpg"
+    img_path = app.config["BASE_IMAGE_PATH"] + img_name
     cv2.imwrite(img_path, img)
-    call_str = r'python C:\Projects\FALdetector-master\global_classifier.py --model_path C:\Projects\FALdetector-master\weights\global.pth --input_path ' + img_path
-    print(call_str.split())
-    return Response(response={'fake_chance': ""}, status=200, mimetype="application/json")
-    proc = subprocess.Popen(args=call_str.split(), stdout=subprocess.PIPE, cwd=r'C:\Projects\FALdetector-master')
+    proc = subprocess.Popen(args=construct_call_str(img_path).split(), stdout=subprocess.PIPE, cwd=app.config["IMG_PROCESS_PATH"])
     proc.wait()
     #if no errors
     stdout = proc.stdout.read().decode('utf-8')
