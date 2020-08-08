@@ -1,5 +1,7 @@
 # app.py
-from flask import Flask, request, Response
+from flask import Flask, request, Response, jsonify
+from pymongo import MongoClient
+from exceptions import Unauthorized, BadRequest
 from datetime import datetime
 import jsonpickle
 import numpy as np
@@ -11,13 +13,35 @@ import string
 
 app = Flask(__name__)
 app.config.from_object('config')
+client = MongoClient(app.config["MONGO_URI"])
+try:
+   # The ismaster command is cheap and does not require auth.
+   client.admin.command('ismaster')
+except ConnectionFailure:
+   print("Server not available")
+db = client["admin"]
+
+@app.errorhandler(Unauthorized)
+def handle_invalid_usage(error):
+    response = jsonpickle.encode(error.to_dict())
+    return Response(response=response, status=error.status_code, mimetype="application/json")
+    
+@app.errorhandler(BadRequest)
+def handle_invalid_usage2(error):
+    response = jsonpickle.encode(error.to_dict())
+    return Response(response=response, status=error.status_code, mimetype="application/json")
+
+def authorize(client):
+    return False
 
 def construct_call_str(img_path):
     return 'python ' + app.config["IMG_PROCESS_PATH"] + 'global_classifier.py --model_path ' + app.config["IMG_PROCESS_PATH"] +  r'weights\global.pth --input_path ' + img_path
 
-@app.route('/api/upload', methods=['POST'])
-def test():
+@app.route('/image/upload', methods=['POST'])
+def image_upload():
     r = request
+    if authorize(r.authorization) == False:
+        raise Unauthorized('This user does not exist')
     # convert string of image data to uint8
     nparr = np.fromstring(r.data, np.uint8)
     # decode image
@@ -26,18 +50,29 @@ def test():
     now = datetime.now()
     hash_str = now.strftime("%m/%d/%Y, %H:%M:%S") + r.authorization.username
     img_name = hashlib.sha224(hash_str.encode('utf-8')).hexdigest() + ".jpg"
-    img_path = app.config["BASE_IMAGE_PATH"] + img_name
+    img_path = app.config["BASE_IMAGE_PATH"] + r.authorization.username
     cv2.imwrite(img_path, img)
-    proc = subprocess.Popen(args=construct_call_str(img_path).split(), stdout=subprocess.PIPE, cwd=app.config["IMG_PROCESS_PATH"])
-    proc.wait()
+    #proc = subprocess.Popen(args=construct_call_str(img_path).split(), stdout=subprocess.PIPE, cwd=app.config["IMG_PROCESS_PATH"])
+    #proc.wait()
     #if no errors
-    stdout = proc.stdout.read().decode('utf-8')
-    fake_chance = re.findall(r'[0-9]+', stdout)
-    print(fake_chance)
-    response = {'fake_chance': fake_chance[0], 'errMsg': ''
-    }
+    #stdout = proc.stdout.read().decode('utf-8')
+    #fake_chance = re.findall(r'[0-9]+', stdout)
+    response = {'fake_chance': 99}
     response_pickled = jsonpickle.encode(response)
     return Response(response=response_pickled, status=200, mimetype="application/json")
+
+@app.route('/users/create', methods=['POST'])
+def users_create():
+    data = request.get_json()
+    if not "username" in data or data["username"] == "":
+        raise BadRequest('A username must be provided')
+    if not "password" in data or data["password"] == "":
+        raise BadRequest('A password must be provided')
+    users = db["users"]
+    if users.find({ "username":  data["username"] }) == None:
+        raise BadRequest('Username provided is already exists')
+    users.insert_one({"username": data["username"], "password": data["password"]})
+    return Response(status=200, mimetype="application/json")
 
 if __name__ == '__main__':
     app.run(debug=True)
