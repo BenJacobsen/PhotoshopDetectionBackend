@@ -14,11 +14,6 @@ import string
 app = Flask(__name__)
 app.config.from_object('config')
 client = MongoClient(app.config["MONGO_URI"])
-try:
-   # The ismaster command is cheap and does not require auth.
-   client.admin.command('ismaster')
-except ConnectionFailure:
-   print("Server not available")
 db = client["admin"]
 
 @app.errorhandler(Unauthorized)
@@ -69,8 +64,9 @@ def users_create():
     if not "password" in data or data["password"] == "":
         raise BadRequest('A password must be provided')
     users = db["users"]
-    if users.find({ "username":  data["username"] }) == None:
-        raise BadRequest('Username provided is already exists')
+    print(users.find_one({ "username":  data["username"] }))
+    if not users.find_one({ "username":  data["username"] }) is None:
+        raise BadRequest('Username provided already exists')
     users.insert_one({"username": data["username"], "password": data["password"]})
     return Response(status=200, mimetype="application/json")
 
