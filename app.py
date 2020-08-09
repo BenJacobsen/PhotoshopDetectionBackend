@@ -2,6 +2,7 @@
 from flask import Flask, request, Response, jsonify
 from pymongo import MongoClient
 from exceptions import Unauthorized, BadRequest
+from auth import Credentials
 from datetime import datetime
 import jsonpickle
 import numpy as np
@@ -26,8 +27,12 @@ def handle_invalid_usage2(error):
     response = jsonpickle.encode(error.to_dict())
     return Response(response=response, status=error.status_code, mimetype="application/json")
 
-def authorize(client):
-    return False
+def authenticate(creds):
+    user = db.users.find_one({ "username":  creds.username })
+    if user is None:
+        raise BadRequest('No user associated with the provided username')
+    if user["password"] != creds.password:
+        raise BadRequest('Password is incorrect')
 
 def construct_call_str(img_path):
     return 'python ' + app.config["IMG_PROCESS_PATH"] + 'global_classifier.py --model_path ' + app.config["IMG_PROCESS_PATH"] +  r'weights\global.pth --input_path ' + img_path
@@ -35,8 +40,9 @@ def construct_call_str(img_path):
 @app.route('/image/upload', methods=['POST'])
 def image_upload():
     r = request
-    if authorize(r.authorization) == False:
-        raise Unauthorized('This user does not exist')
+    creds = Credentials(r.authorization.username, r.authorization.password)
+    authenticate(creds)
+    raise BadRequest('Authenticated!')
     # convert string of image data to uint8
     nparr = np.fromstring(r.data, np.uint8)
     # decode image
@@ -63,11 +69,10 @@ def users_create():
         raise BadRequest('A username must be provided')
     if not "password" in data or data["password"] == "":
         raise BadRequest('A password must be provided')
-    users = db["users"]
-    print(users.find_one({ "username":  data["username"] }))
-    if not users.find_one({ "username":  data["username"] }) is None:
+    print(db.users.find_one({ "username":  data["username"] }))
+    if not db.users.find_one({ "username":  data["username"] }) is None:
         raise BadRequest('Username provided already exists')
-    users.insert_one({"username": data["username"], "password": data["password"]})
+    db.users.insert_one({"username": data["username"], "password": data["password"]})
     return Response(status=200, mimetype="application/json")
 
 if __name__ == '__main__':
