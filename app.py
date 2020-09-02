@@ -1,5 +1,6 @@
 # app.py
 from flask import Flask, request, Response, jsonify
+from functools import wraps
 from pymongo import MongoClient
 from exceptions import Unauthorized, BadRequest
 from auth import Credentials
@@ -27,21 +28,27 @@ def handle_invalid_usage2(error):
     response = jsonpickle.encode(error.to_dict())
     return Response(response=response, status=error.status_code, mimetype="application/json")
 
-def authenticate(creds):
-    user = db.users.find_one({ "username":  creds.username })
-    if user is None:
-        raise BadRequest('No user associated with the provided username')
-    if user["password"] != creds.password:
-        raise BadRequest('Password is incorrect')
+def authenticate(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        r = request
+        creds = Credentials(r.authorization.username, r.authorization.password)
+        user = db.users.find_one({ "username":  creds.username })
+        if user is None:
+            raise BadRequest('No user associated with the provided username')
+        if user["password"] != creds.password:
+            raise BadRequest('Password is incorrect')
+        return f(*args, **kwargs)
+    return decorated_function
 
 def construct_call_str(img_path):
     return 'python ' + app.config["IMG_PROCESS_PATH"] + 'global_classifier.py --model_path ' + app.config["IMG_PROCESS_PATH"] +  r'weights\global.pth --input_path ' + img_path
 
+
 @app.route('/image/upload', methods=['POST'])
+@authenticate
 def image_upload():
     r = request
-    creds = Credentials(r.authorization.username, r.authorization.password)
-    authenticate(creds)
     raise BadRequest('Authenticated!')
     # convert string of image data to uint8
     nparr = np.fromstring(r.data, np.uint8)
