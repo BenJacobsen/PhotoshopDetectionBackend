@@ -8,12 +8,7 @@ from exceptions import Unauthorized, BadRequest
 import pika
 from datetime import datetime
 import jsonpickle
-import numpy as np
 import hashlib
-import re
-import cv2
-import subprocess
-import string
 
 app = Flask(__name__)
 app.config.from_object('app_config')
