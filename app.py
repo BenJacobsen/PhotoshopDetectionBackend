@@ -6,7 +6,6 @@ from enum import Enum
 from pymongo import MongoClient
 from exceptions import Unauthorized, BadRequest
 import pika
-from auth import Credentials
 from datetime import datetime
 import jsonpickle
 import numpy as np
