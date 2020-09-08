@@ -4,7 +4,7 @@ from pymongo import MongoClient
 from enum import Enum
 #match app_config.py below
 config_object = {"BASE_IMAGE_PATH": , "IMG_PROCESS_PATH": ,
-"MONGO_URI" : , "THIS_DIR": }
+"MONGO_URI" : , "MQ_HOST": , "THIS_DIR": }
 
 class ImageStatus(Enum):
     RUNNING = 1
@@ -13,6 +13,8 @@ class ImageStatus(Enum):
 
 client = MongoClient(config_object["MONGO_URI"])
 db = client["admin"]
+
+#normally configured to use https://github.com/PeterWang512/FALdetector for processing. Use test_process.py as a placeholder first
 def construct_call_str(img_name):
     #return 'python ' + config_object["IMG_PROCESS_PATH"] + 'global_classifier.py --model_path ' + config_object["IMG_PROCESS_PATH"] 
     #+  r'weights\global.pth --input_path ' + config_object["BASE_IMAGE_PATH"] + img_name + ".jpg"
@@ -28,7 +30,6 @@ def main():
 
         print(" [x] Received %r" % body)
         img_name = body.decode("utf-8")
-        print(img_name)
         proc = subprocess.Popen(args=construct_call_str(body).split(), stdout=subprocess.PIPE, cwd=config_object["IMG_PROCESS_PATH"])
         proc.wait()
         #if no errors set the image document to COMPLETE with the outputted fakeChance

@@ -1,4 +1,3 @@
-# app.py
 from flask import Flask, request, Response, jsonify
 from functools import wraps
 import base64
@@ -45,10 +44,8 @@ def authenticate(f):
         return f(*args, **kwargs)
     return decorated_function
 
-def construct_call_str(img_path):
-    return 'python ' + app.config["IMG_PROCESS_PATH"] + 'global_classifier.py --model_path ' + app.config["IMG_PROCESS_PATH"] +  r'weights\global.pth --input_path ' + img_path
 
-
+#recieves base64 image data, uploads it to the filesystem and pushes the task to the workers
 @app.route('/image/upload', methods=['POST'])
 @authenticate
 def image_upload():
@@ -67,7 +64,7 @@ def image_upload():
         image_decode = base64.b64decode(img_data)
         image_result.write(image_decode)
 
-    connection = pika.BlockingConnection(pika.ConnectionParameters('localhost'))
+    connection = pika.BlockingConnection(pika.ConnectionParameters(app.config["MQ_HOST"]))
     channel = connection.channel()
     #push image hash to round robin task queue for processing
     channel.basic_publish(exchange='',
@@ -79,6 +76,7 @@ def image_upload():
     return Response(response=response_pickled, status=200, mimetype="application/json")
 
 
+#gets the result of the processes image by id
 @app.route('/image/result', methods=['GET'])
 @authenticate
 def image_result():
@@ -100,6 +98,8 @@ def image_result():
         response_pickled = jsonpickle.encode({"fakeChance": image["fakeChance"]})
         return Response(response=response_pickled, status=200, mimetype="application/json")
 
+
+#creates a user with username and password supplied
 @app.route('/users/create', methods=['POST'])
 def users_create():
     data = request.get_json()
