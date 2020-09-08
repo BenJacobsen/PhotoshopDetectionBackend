@@ -2,8 +2,9 @@
 import pika, sys, os, re, subprocess
 from pymongo import MongoClient
 from enum import Enum
-config_object = {"BASE_IMAGE_PATH": "C:\\Github\PSImages\\", "IMG_PROCESS_PATH": "C:\\Github\\FALdetector\\",
-"MONGO_URI" : "mongodb://127.0.0.1:27017", "THIS_DIR": "C:\\Github\\PhotoshopDetectionBackend\\worker\\"}
+#match app_config.py below
+config_object = {"BASE_IMAGE_PATH": , "IMG_PROCESS_PATH": ,
+"MONGO_URI" : , "THIS_DIR": }
 
 class ImageStatus(Enum):
     RUNNING = 1

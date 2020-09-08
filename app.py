@@ -39,11 +39,14 @@ def handle_invalid_usage2(error):
 def authenticate(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        creds = Credentials(request.authorization.username, request.authorization.password)
-        user = db.users.find_one({ "username":  creds.username })
+        if request.authorization.username == "":
+            raise BadRequest('Username must not be null')
+        if request.authorization.password == "":
+            raise BadRequest('Password must not be null')
+        user = db.users.find_one({ "username":  request.authorization.username })
         if user is None:
             raise BadRequest('No user associated with the provided username')
-        if user["password"] != creds.password:
+        if user["password"] != request.authorization.password:
             raise BadRequest('Password is incorrect')
         return f(*args, **kwargs)
     return decorated_function
