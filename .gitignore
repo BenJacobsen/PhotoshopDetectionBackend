@@ -1,1 +1,2 @@
-dev_config.py
+app_config_dev.py
+worker/worker_config_dev.py
