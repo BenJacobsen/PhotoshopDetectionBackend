@@ -3,7 +3,7 @@ import pika, sys, os, re, subprocess
 import boto3
 from pymongo import MongoClient
 from enum import Enum
-from worker_config_dev import config
+from worker_config import config
 #match app_config.py below
 
 class ImageStatus(Enum):
