@@ -1,5 +1,6 @@
 from flask import Flask, request, Response, jsonify
 from functools import wraps
+import boto3
 import base64
 from enum import Enum
 from pymongo import MongoClient
@@ -13,6 +14,12 @@ app = Flask(__name__)
 app.config.from_object('app_config')
 client = MongoClient(app.config["MONGO_URI"])
 db = client["admin"]
+s3 = boto3.resource(
+    service_name='s3',
+    region_name=app.config["AWS_REGION"],
+    aws_access_key_id=app.config["AWS_ACCESSID"],
+    aws_secret_access_key= app.config["AWS_ACCESSKEY"]
+)
 
 class ImageStatus(Enum):
     RUNNING = 1
@@ -52,7 +59,6 @@ def image_upload():
     img_data = str(request.data).split(',')[-1]
     now = datetime.now()
     hash_str = hashlib.sha224((now.strftime("%m/%d/%Y, %H:%M:%S") + request.authorization.username).encode('utf-8')).hexdigest() #hash by ms as two requests could be sent in a sec
-
     #check against mongo to see if hash exists, recreate hash if it does. if not create entry "not done" if its not done
     while not db.images.find_one({ "id":  hash_str }) is None:
         hash_str = hashlib.sha224((now.strftime("%m/%d/%Y, %H:%M:%S") + request.authorization.username).encode('utf-8')).hexdigest()
@@ -60,9 +66,11 @@ def image_upload():
     "timeCreated": now.strftime("%m/%d/%Y, %H:%M:%S"), "status": ImageStatus.RUNNING.value, "fakeChance": 0 })
 
     #write image to filesystem
-    with open(app.config["BASE_IMAGE_PATH"] + hash_str + ".jpg", "wb") as image_result:
+    new_image_name = hash_str + ".jpg"
+    with open(app.config["BASE_IMAGE_PATH"] + new_image_name, "wb") as image_result:
         image_decode = base64.b64decode(img_data)
         image_result.write(image_decode)
+        s3.Bucket(app.config["AWS_S3_BUCKET"]).upload_file(Filename=app.config["BASE_IMAGE_PATH"] + new_image_name, Key=new_image_name)
 
     connection = pika.BlockingConnection(pika.ConnectionParameters(app.config["MQ_HOST"]))
     channel = connection.channel()
@@ -107,7 +115,6 @@ def users_create():
         raise BadRequest('A username must be provided')
     if not "password" in data or data["password"] == "":
         raise BadRequest('A password must be provided')
-    print(db.users.find_one({ "username":  data["username"] }))
     if not db.users.find_one({ "username":  data["username"] }) is None:
         raise BadRequest('Username provided already exists')
     db.users.insert_one({"username": data["username"], "password": data["password"]})
